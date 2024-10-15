@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, abort
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from sqlalchemy import func
@@ -19,11 +20,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = uri or 'sqlite:///workouts.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(255))
     workouts = db.relationship('Workout', backref='user', lazy=True)
     is_admin = db.Column(db.Boolean, default=False)
 
@@ -334,3 +336,6 @@ def admin_weekly_workout():
 with app.app_context():
     db.create_all()
     populate_exercises()
+
+if __name__ == '__main__':
+    app.run(debug=True)
