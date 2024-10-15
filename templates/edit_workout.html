@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Workout - ftb lifting board</title>
+</head>
+<body>
+    <h1>Edit Workout</h1>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul>
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+    <form method="POST">
+        <label for="date">Date:</label>
+        <input type="date" id="date" name="date" value="{{ workout.date }}" required>
+        <br>
+        <div id="sets-container" data-set-count="{{ workout.sets|length }}">
+            {% for set in workout.sets %}
+                <div class="set">
+                    <select name="exercise_{{ loop.index }}" required>
+                        {% for exercise in exercises %}
+                            <option value="{{ exercise.id }}" {% if exercise.id == set.exercise_id %}selected{% endif %}>
+                                {{ exercise.name }} ({{ exercise.muscle_group }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <input type="number" name="weight_{{ loop.index }}" value="{{ set.weight }}" step="0.1" required>
+                    <input type="number" name="reps_{{ loop.index }}" value="{{ set.reps }}" required>
+                </div>
+            {% endfor %}
+        </div>
+        <button type="button" id="add-set">Add Set</button>
+        <input type="hidden" name="set_count" id="set-count" value="{{ workout.sets|length }}">
+        <br>
+        <input type="submit" value="Update Workout">
+    </form>
+    <a href="{{ url_for('user_profile') }}">Back to Profile</a>
+
+    <script>
+        const setsContainer = document.getElementById('sets-container');
+        const addSetButton = document.getElementById('add-set');
+        const setCountInput = document.getElementById('set-count');
+        let setCount = parseInt(setsContainer.dataset.setCount, 10);
+
+        addSetButton.addEventListener('click', () => {
+            setCount++;
+            const newSet = document.createElement('div');
+            newSet.className = 'set';
+            newSet.innerHTML = `
+                <select name="exercise_${setCount}" required>
+                    {% for exercise in exercises %}
+                        <option value="{{ exercise.id }}">{{ exercise.name }} ({{ exercise.muscle_group }})</option>
+                    {% endfor %}
+                </select>
+                <input type="number" name="weight_${setCount}" placeholder="Weight" step="0.1" required>
+                <input type="number" name="reps_${setCount}" placeholder="Reps" required>
+            `;
+            setsContainer.appendChild(newSet);
+            setCountInput.value = setCount;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ftb lifting board</title>
+</head>
+<body>
+    <h1>Welcome to the ftb lifting board</h1>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul>
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+    <nav>
+        {% if user %}
+            <a href="{{ url_for('user_profile') }}">My Profile</a>
+            <a href="{{ url_for('add_workout') }}">Add Workout</a>
+            <a href="{{ url_for('leaderboard') }}">Leaderboard</a>
+            {% if user.is_admin %}
+                <a href="{{ url_for('admin_weekly_workout') }}">Admin - Weekly Workout</a>
+            {% endif %}
+            <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('register') }}">Register</a>
+        {% endif %}
+    </nav>
+
+    {% if user and suggested_workout %}
+        <h2>Suggested Workout for Today: {{ suggested_workout.name }}</h2>
+        <ul>
+            {% for exercise in suggested_workout.exercises %}
+                <li>{{ exercise.exercise.name }}: {{ exercise.sets }} sets of {{ exercise.reps }} reps</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</body>
+</html>
