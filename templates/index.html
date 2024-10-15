@@ -7,6 +7,7 @@
 </head>
 <body>
     <h1>Welcome to the ftb lifting board</h1>
+    
     {% with messages = get_flashed_messages() %}
         {% if messages %}
             <ul>
@@ -31,7 +32,7 @@
         {% endif %}
     </nav>
 
-    {% if user and suggested_workout %}
+    {% if 'user_id' in session and suggested_workout %}
         <h2>Suggested Workout for Today: {{ suggested_workout.name }}</h2>
         <ul>
             {% for exercise in suggested_workout.exercises %}
@@ -39,5 +40,7 @@
             {% endfor %}
         </ul>
     {% endif %}
+
+    <img src="{{ url_for('static', filename='strongFrog.jpg') }}" alt="FTB Lifting Board" style="max-width: 100%; height: auto;">
 </body>
 </html>
