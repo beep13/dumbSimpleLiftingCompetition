@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -307,31 +307,65 @@ def admin_weekly_workout():
         abort(403)
     
     if request.method == 'POST':
-        WeeklyWorkout.query.delete()
+        if 'new_exercise' in request.form:
+            name = request.form.get('exercise_name').strip()
+            muscle_group = request.form.get('muscle_group')
+            
+            if name and muscle_group:
+                existing_exercise = Exercise.query.filter(func.lower(Exercise.name) == name.lower()).first()
+                if existing_exercise:
+                    return jsonify({'status': 'error', 'message': f'Exercise "{name}" already exists!'}), 400
+                else:
+                    new_exercise = Exercise(name=name, muscle_group=muscle_group)
+                    db.session.add(new_exercise)
+                    db.session.commit()
+                    return jsonify({'status': 'success', 'message': f'New exercise "{name}" added successfully!'}), 200
+            else:
+                return jsonify({'status': 'error', 'message': 'Exercise name and muscle group are required!'}), 400
+        else:
+            # Handle weekly workout updates
+            WeeklyWorkout.query.delete()  # Clear existing workouts
+            
+            days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            for day in days:
+                workout_name = request.form.get(f'{day}_name')
+                if workout_name:
+                    workout = WeeklyWorkout(day=day, name=workout_name)
+                    db.session.add(workout)
+                    
+                    exercise_count = int(request.form.get(f'{day}_exercise_count', 0))
+                    for i in range(1, exercise_count + 1):
+                        exercise_id = request.form.get(f'{day}_exercise_{i}')
+                        sets = request.form.get(f'{day}_sets_{i}')
+                        reps = request.form.get(f'{day}_reps_{i}')
+                        if exercise_id and sets and reps:
+                            exercise = WorkoutExercise(
+                                exercise_id=exercise_id,
+                                sets=sets,
+                                reps=reps
+                            )
+                            workout.exercises.append(exercise)
+            
+            db.session.commit()
+            flash('Weekly workout routine updated successfully', 'success')
         
-        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        for day in days:
-            name = request.form.get(f'{day}_name')
-            if name:
-                workout = WeeklyWorkout(day=day, name=name)
-                db.session.add(workout)
-                
-                exercise_count = int(request.form.get(f'{day}_exercise_count', 0))
-                for i in range(1, exercise_count + 1):
-                    exercise_id = request.form.get(f'{day}_exercise_{i}')
-                    sets = request.form.get(f'{day}_sets_{i}')
-                    reps = request.form.get(f'{day}_reps_{i}')
-                    if exercise_id and sets and reps:
-                        exercise = WorkoutExercise(exercise_id=exercise_id, sets=sets, reps=reps)
-                        workout.exercises.append(exercise)
-        
-        db.session.commit()
-        flash('Weekly workout routine updated successfully')
         return redirect(url_for('admin_weekly_workout'))
-    
+
+    # GET request handling
     weekly_workouts = WeeklyWorkout.query.all()
-    exercises = Exercise.query.all()
-    return render_template('admin_weekly_workout.html', weekly_workouts=weekly_workouts, exercises=exercises)
+    exercises = Exercise.query.order_by(Exercise.muscle_group, Exercise.name).all()
+    muscle_groups = db.session.query(func.distinct(Exercise.muscle_group)).order_by(Exercise.muscle_group).all()
+    muscle_groups = [group[0] for group in muscle_groups]  # Flatten the result
+
+    return render_template('admin_weekly_workout.html', 
+                           weekly_workouts=weekly_workouts, 
+                           exercises=exercises, 
+                           muscle_groups=muscle_groups)
+
+@app.route('/exercises', methods=['GET'])
+def get_exercises():
+    exercises = Exercise.query.order_by(Exercise.muscle_group, Exercise.name).all()
+    return jsonify([{'id': e.id, 'name': e.name, 'muscle_group': e.muscle_group} for e in exercises])
 
 with app.app_context():
     db.create_all()

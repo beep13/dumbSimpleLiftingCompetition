@@ -4,12 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - Weekly Workout Routine</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
     <h1>Admin - Weekly Workout Routine</h1>
-    <form method="POST">
+    
+    <!-- Add New Exercise Form -->
+    <h2>Add New Exercise</h2>
+    <form method="POST" id="new-exercise-form">
+        <input type="hidden" name="new_exercise" value="1">
+        <label for="exercise_name">Exercise Name:</label>
+        <input type="text" id="exercise_name" name="exercise_name" required>
+        <label for="muscle_group">Muscle Group:</label>
+        <select id="muscle_group" name="muscle_group" required>
+            <option value="">Select a muscle group</option>
+            {% for group in muscle_groups %}
+                <option value="{{ group }}">{{ group }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Add Exercise</button>
+    </form>
+
+    <!-- Existing Weekly Workout Form -->
+    <h2>Weekly Workout Routine</h2>
+    <form method="POST" id="workout-form">
         {% for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
-            <h2>{{ day }}</h2>
+            <h3>{{ day }}</h3>
             <label for="{{ day }}_name">Workout Name:</label>
             <input type="text" id="{{ day }}_name" name="{{ day }}_name" value="{{ weekly_workouts|selectattr('day', 'equalto', day)|map(attribute='name')|first or '' }}">
             <div id="{{ day }}_exercises">
@@ -17,9 +37,14 @@
                 {% if workout %}
                     {% for exercise in workout.exercises %}
                         <div>
-                            <select name="{{ day }}_exercise_{{ loop.index }}">
-                                {% for ex in exercises %}
-                                    <option value="{{ ex.id }}" {% if ex.id == exercise.exercise_id %}selected{% endif %}>{{ ex.name }}</option>
+                            <select name="{{ day }}_exercise_{{ loop.index }}" class="exercise-select">
+                                <option value="">Select an exercise</option>
+                                {% for group in muscle_groups %}
+                                    <optgroup label="{{ group }}">
+                                        {% for ex in exercises if ex.muscle_group == group %}
+                                            <option value="{{ ex.id }}" {% if ex.id == exercise.exercise_id %}selected{% endif %}>{{ ex.name }}</option>
+                                        {% endfor %}
+                                    </optgroup>
                                 {% endfor %}
                             </select>
                             <input type="number" name="{{ day }}_sets_{{ loop.index }}" value="{{ exercise.sets }}" min="1" placeholder="Sets">
@@ -35,23 +60,79 @@
     </form>
 
     <script>
+        function refreshExerciseDropdowns() {
+            $.get('/exercises', function(exercises) {
+                
+                // Group exercises by muscle group
+                const groupedExercises = {};
+                exercises.forEach(function(exercise) {
+                    if (!groupedExercises[exercise.muscle_group]) {
+                        groupedExercises[exercise.muscle_group] = [];
+                    }
+                    groupedExercises[exercise.muscle_group].push(exercise);
+                });
+
+                // Update each dropdown
+                $('.exercise-select').each(function() {
+                    const select = $(this);
+                    const currentValue = select.val();
+                    select.empty().append('<option value="">Select an exercise</option>');
+
+                    Object.keys(groupedExercises).sort().forEach(function(group) {
+                        const optgroup = $('<optgroup>').attr('label', group);
+                        groupedExercises[group].forEach(function(exercise) {
+                            optgroup.append($('<option>', {
+                                value: exercise.id,
+                                text: exercise.name
+                            }));
+                        });
+                        select.append(optgroup);
+                    });
+
+                    // Restore the previously selected value if it still exists
+                    select.val(currentValue);
+                });
+            });
+        }
+
+        // Refresh exercise list after adding a new exercise
+        $('#new-exercise-form').on('submit', function(e) {
+            e.preventDefault();
+            const form = $(this);
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: form.serialize(),
+                success: function(response) {
+                    alert('New exercise added successfully!');
+                    setTimeout(refreshExerciseDropdowns, 100);  // Delay refresh slightly
+                    form[0].reset();  // Clear the form
+                },
+                error: function(xhr, status, error) {
+                    alert('Error adding exercise. Please try again.');
+                }
+            });
+        });
+
+        // Initial load of exercise dropdowns
+        $(document).ready(refreshExerciseDropdowns);
+
+        // Function to add new exercise to a day
         function addExercise(day) {
             const container = document.getElementById(`${day}_exercises`);
             const count = container.children.length + 1;
             const div = document.createElement('div');
             div.innerHTML = `
-                <select name="${day}_exercise_${count}">
-                    {% for exercise in exercises %}
-                        <option value="{{ exercise.id }}">{{ exercise.name }}</option>
-                    {% endfor %}
+                <select name="${day}_exercise_${count}" class="exercise-select">
+                    <option value="">Select an exercise</option>
                 </select>
                 <input type="number" name="${day}_sets_${count}" min="1" placeholder="Sets">
                 <input type="number" name="${day}_reps_${count}" min="1" placeholder="Reps">
             `;
             container.appendChild(div);
             document.getElementById(`${day}_exercise_count`).value = count;
+            refreshExerciseDropdowns();  // Refresh to populate the new dropdown
         }
     </script>
 </body>
 </html>
-
