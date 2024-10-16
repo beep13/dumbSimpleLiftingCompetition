@@ -1,69 +1,91 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Workout - ftb lifting board</title>
-</head>
-<body>
-    <h1>Edit Workout</h1>
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <ul>
-                {% for message in messages %}
-                    <li>{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
-    <form method="POST">
-        <label for="date">Date:</label>
-        <input type="date" id="date" name="date" value="{{ workout.date }}" required>
-        <br>
-        <div id="sets-container" data-set-count="{{ workout.sets|length }}">
-            {% for set in workout.sets %}
-                <div class="set">
-                    <select name="exercise_{{ loop.index }}" required>
-                        {% for exercise in exercises %}
-                            <option value="{{ exercise.id }}" {% if exercise.id == set.exercise_id %}selected{% endif %}>
-                                {{ exercise.name }} ({{ exercise.muscle_group }})
-                            </option>
+{% extends "base.html" %}
+
+{% block title %} - Edit Workout{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Edit Workout</h1>
+<form method="POST" action="{{ url_for('edit_workout', workout_id=workout.id) }}">
+    <div class="mb-3">
+        <label for="date" class="form-label">Date:</label>
+        <input type="date" id="date" name="date" class="form-control" value="{{ workout.date.strftime('%Y-%m-%d') }}" required>
+    </div>
+    <div id="exercises" data-exercise-count="{{ workout.exercises|length }}">
+        {% for exercise in workout.exercises %}
+        <div class="exercise-entry mb-3">
+            <div class="row">
+                <div class="col-md-4">
+                    <select name="exercise_{{ loop.index }}" class="form-select" required>
+                        <option value="">Select an exercise</option>
+                        {% for ex in all_exercises %}
+                            <option value="{{ ex.id }}" {% if ex.id == exercise.exercise_id %}selected{% endif %}>{{ ex.name }}</option>
                         {% endfor %}
                     </select>
-                    <input type="number" name="weight_{{ loop.index }}" value="{{ set.weight }}" step="0.1" required>
-                    <input type="number" name="reps_{{ loop.index }}" value="{{ set.reps }}" required>
                 </div>
-            {% endfor %}
+                <div class="col-md-2">
+                    <input type="number" name="sets_{{ loop.index }}" class="form-control" value="{{ exercise.sets }}" placeholder="Sets" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="reps_{{ loop.index }}" class="form-control" value="{{ exercise.reps }}" placeholder="Reps" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="weight_{{ loop.index }}" class="form-control" value="{{ exercise.weight }}" placeholder="Weight (lbs)" required>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-danger remove-exercise">Remove</button>
+                </div>
+            </div>
         </div>
-        <button type="button" id="add-set">Add Set</button>
-        <input type="hidden" name="set_count" id="set-count" value="{{ workout.sets|length }}">
-        <br>
-        <input type="submit" value="Update Workout">
-    </form>
-    <a href="{{ url_for('user_profile') }}">Back to Profile</a>
+        {% endfor %}
+    </div>
+    <button type="button" id="add-exercise" class="btn btn-secondary mb-3">Add Another Exercise</button>
+    <input type="hidden" id="exercise-count" name="exercise_count" value="{{ workout.exercises|length }}">
+    <button type="submit" class="btn btn-primary">Update Workout</button>
+</form>
+{% endblock %}
 
-    <script>
-        const setsContainer = document.getElementById('sets-container');
-        const addSetButton = document.getElementById('add-set');
-        const setCountInput = document.getElementById('set-count');
-        let setCount = parseInt(setsContainer.dataset.setCount, 10);
+{% block extra_js %}
+<script>
+    let exerciseCount = parseInt(document.getElementById('exercises').dataset.exerciseCount, 10);
 
-        addSetButton.addEventListener('click', () => {
-            setCount++;
-            const newSet = document.createElement('div');
-            newSet.className = 'set';
-            newSet.innerHTML = `
-                <select name="exercise_${setCount}" required>
-                    {% for exercise in exercises %}
-                        <option value="{{ exercise.id }}">{{ exercise.name }} ({{ exercise.muscle_group }})</option>
-                    {% endfor %}
-                </select>
-                <input type="number" name="weight_${setCount}" placeholder="Weight" step="0.1" required>
-                <input type="number" name="reps_${setCount}" placeholder="Reps" required>
-            `;
-            setsContainer.appendChild(newSet);
-            setCountInput.value = setCount;
-        });
-    </script>
-</body>
-</html>
+    document.getElementById('add-exercise').addEventListener('click', function() {
+        exerciseCount++;
+        const exercisesDiv = document.getElementById('exercises');
+        const newExercise = document.createElement('div');
+        newExercise.className = 'exercise-entry mb-3';
+        newExercise.innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <select name="exercise_${exerciseCount}" class="form-select" required>
+                        <option value="">Select an exercise</option>
+                        {% for ex in all_exercises %}
+                            <option value="{{ ex.id }}">{{ ex.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="sets_${exerciseCount}" class="form-control" placeholder="Sets" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="reps_${exerciseCount}" class="form-control" placeholder="Reps" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="weight_${exerciseCount}" class="form-control" placeholder="Weight (lbs)" required>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-danger remove-exercise">Remove</button>
+                </div>
+            </div>
+        `;
+        exercisesDiv.appendChild(newExercise);
+        document.getElementById('exercise-count').value = exerciseCount;
+    });
+
+    document.getElementById('exercises').addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-exercise')) {
+            e.target.closest('.exercise-entry').remove();
+            exerciseCount--;
+            document.getElementById('exercise-count').value = exerciseCount;
+        }
+    });
+</script>
+{% endblock %}

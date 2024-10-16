@@ -5,18 +5,38 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from sqlalchemy import func
 import os
+from dotenv import load_dotenv
+import logging
+
+load_dotenv()
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
 # Secret key configuration
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
 # Database configuration
-uri = os.environ.get("DATABASE_URL") 
-if uri and uri.startswith("postgres://"):
-    uri = uri.replace("postgres://", "postgresql://", 1)
+try:
+    if os.getenv('FLASK_ENV') == 'production':
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DEVELOPMENT_DATABASE_URL')
 
-app.config['SQLALCHEMY_DATABASE_URI'] = uri or 'sqlite:///workouts.db'
+    if not app.config['SQLALCHEMY_DATABASE_URI']:
+        raise ValueError("Database URL is not set")
+
+    logger.info(f"Using database: {app.config['SQLALCHEMY_DATABASE_URI']}")
+except Exception as e:
+    logger.error(f"Error configuring database: {str(e)}")
+    raise
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -205,12 +225,12 @@ def leaderboard():
 @app.route('/user_profile')
 def user_profile():
     if 'user_id' not in session:
-        flash('Please login to view your profile')
+        flash('Please login to view your profile', 'warning')
         return redirect(url_for('login'))
     
     user = User.query.get(session['user_id'])
     if user is None:
-        flash('User not found')
+        flash('User not found', 'danger')
         return redirect(url_for('index'))
     
     workouts = Workout.query.filter_by(user_id=user.id).order_by(Workout.date.desc()).all()
@@ -299,12 +319,11 @@ def populate_exercises():
 @app.route('/admin/weekly_workout', methods=['GET', 'POST'])
 def admin_weekly_workout():
     if 'user_id' not in session:
-        flash('Please login to access this page')
-        return redirect(url_for('login'))
+        abort(403)  # Forbidden
     
     user = User.query.get(session['user_id'])
     if not user or not user.is_admin:
-        abort(403)
+        abort(403)  # Forbidden
     
     if request.method == 'POST':
         if 'new_exercise' in request.form:
@@ -367,9 +386,20 @@ def get_exercises():
     exercises = Exercise.query.order_by(Exercise.muscle_group, Exercise.name).all()
     return jsonify([{'id': e.id, 'name': e.name, 'muscle_group': e.muscle_group} for e in exercises])
 
+@app.context_processor
+def utility_processor():
+    def get_current_user():
+        if 'user_id' in session:
+            return User.query.get(session['user_id'])
+        return None
+    return dict(get_current_user=get_current_user)
+
 with app.app_context():
     db.create_all()
     populate_exercises()
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    try:
+        app.run(debug=True)
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")

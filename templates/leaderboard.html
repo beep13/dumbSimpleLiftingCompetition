@@ -1,55 +1,48 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaderboard - ftb lifting board</title>
-</head>
-<body>
-    <h1>Leaderboard</h1>
-    <form method="GET">
-        <label for="muscle_group">Filter by Muscle Group:</label>
-        <select name="muscle_group" id="muscle_group">
-            <option value="">All</option>
-            {% for group in muscle_groups %}
-                <option value="{{ group }}" {% if group == selected_group %}selected{% endif %}>{{ group }}</option>
-            {% endfor %}
-        </select>
-        
-        <label for="time_period">Time Period:</label>
-        <select name="time_period" id="time_period">
-            <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All Time</option>
-            <option value="week" {% if selected_period == 'week' %}selected{% endif %}>This Week</option>
-            <option value="month" {% if selected_period == 'month' %}selected{% endif %}>This Month</option>
-            <option value="year" {% if selected_period == 'year' %}selected{% endif %}>This Year</option>
-        </select>
-        
-        <input type="submit" value="Filter">
-    </form>
+{% extends "base.html" %}
+
+{% block title %} - Leaderboard{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Leaderboard</h1>
+<form method="GET">
+    <label for="muscle_group">Filter by Muscle Group:</label>
+    <select name="muscle_group" id="muscle_group">
+        <option value="">All</option>
+        {% for group in muscle_groups %}
+            <option value="{{ group }}" {% if group == selected_group %}selected{% endif %}>{{ group }}</option>
+        {% endfor %}
+    </select>
     
-    <table>
-        <thead>
-            <tr>
-                <th>Rank</th>
-                <th>Username</th>
-                <th>Total Volume (Weight * Reps)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in leaderboard %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ user.username }}</td>
-                    <td>{{ user.total_volume|round(2) }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <label for="time_period">Time Period:</label>
+    <select name="time_period" id="time_period">
+        <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All Time</option>
+        <option value="week" {% if selected_period == 'week' %}selected{% endif %}>This Week</option>
+        <option value="month" {% if selected_period == 'month' %}selected{% endif %}>This Month</option>
+        <option value="year" {% if selected_period == 'year' %}selected{% endif %}>This Year</option>
+    </select>
     
-    {% if not leaderboard %}
-        <p>No data available for the selected filters.</p>
-    {% endif %}
-    
-    <p><a href="{{ url_for('index') }}">Back to Home</a></p>
-</body>
-</html>
+    <input type="submit" value="Filter">
+</form>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Rank</th>
+            <th>User</th>
+            <th>Total Volume (Weight * Reps)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for entry in leaderboard %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ entry.username }}</td>
+            <td>{{ entry.total_volume|round(2) }} lbs</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if not leaderboard %}
+    <p>No data available for the selected filters.</p>
+{% endif %}
+<p><a href="{{ url_for('index') }}">Back to Home</a></p>
+{% endblock %}
