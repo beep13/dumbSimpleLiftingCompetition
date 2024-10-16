@@ -1,0 +1,59 @@
+body {
+    font-family: "Courier New", Courier, monospace;
+    background-color: #f0f0f0;
+    color: #000080;
+}
+
+.navbar {
+    background-color: #c0c0c0 !important;
+    border-bottom: 2px solid #808080;
+}
+
+.navbar-brand, .nav-link {
+    color: #000080 !important;
+}
+
+.btn {
+    border-radius: 0;
+    border: 2px outset #d3d3d3;
+}
+
+.btn-primary {
+    background-color: #000080;
+    color: #ffffff;
+}
+
+.btn-secondary {
+    background-color: #c0c0c0;
+    color: #000000;
+}
+
+.card {
+    border: 2px solid #808080;
+    border-radius: 0;
+}
+
+.card-header {
+    background-color: #c0c0c0;
+    border-bottom: 2px solid #808080;
+}
+
+input, select, textarea {
+    border: 2px inset #d3d3d3;
+    border-radius: 0;
+    background-color: #ffffff;
+}
+
+.table {
+    border: 2px solid #808080;
+}
+
+.table th {
+    background-color: #c0c0c0;
+}
+
+.alert {
+    border: 2px solid #808080;
+    border-radius: 0;
+}
+

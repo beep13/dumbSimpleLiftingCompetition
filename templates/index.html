@@ -3,13 +3,23 @@
 {% block title %} - Home{% endblock %}
 
 {% block content %}
+<pre class="text-center">
+ _____  _______  ____     _      _  __ _   _               ____                      _ 
+|  ___||__   __||  _ \   | |    (_)/ _| | (_)             |  _ \                    | |
+| |__     | |   | |_) |  | |     _| |_| |_ _ _ __   __ _  | |_) | ___   __ _ _ __ __| |
+|  __|    | |   |  _ <   | |    | |  _| __| | '_ \ / _` | |  _ < / _ \ / _` | '__/ _` |
+| |       | |   | |_) |  | |____| | | | |_| | | | | (_| | | |_) | (_) | (_| | | | (_| |
+|_|       |_|   |____/   |______|_|_|  \__|_|_| |_|\__, | |____/ \___/ \__,_|_|  \__,_|
+                                                    __/ |                              
+                                                   |___/                               
+</pre>
 <h1 class="mb-4">Welcome to FTB Lifting Board</h1>
 
 {% if session.get('user_id') %}
     <p class="lead">Hello, {{ user.username }}! Ready for your next workout?</p>
     <a href="{{ url_for('add_workout') }}" class="btn btn-primary">Log a Workout</a>
 {% else %}
-    <p class="lead">Join our community of lifters and track your progress!</p>
+    <p class="lead">Do it ftb</p>
     <a href="{{ url_for('register') }}" class="btn btn-primary me-2">Register</a>
     <a href="{{ url_for('login') }}" class="btn btn-secondary">Login</a>
 {% endif %}
