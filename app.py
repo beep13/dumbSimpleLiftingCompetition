@@ -503,10 +503,10 @@ def import_strava_workouts():
                     user_id=session['user_id'],
                     strava_id=str(activity.id),
                     name=activity.name,
-                    type=activity.type,
+                    type=str(activity.type),
                     start_date=activity.start_date,
                     distance=float(activity.distance),
-                    moving_time=int(activity.moving_time.total_seconds()),
+                    moving_time=int(activity.moving_time),
                     average_speed=float(activity.average_speed),
                     total_elevation_gain=float(activity.total_elevation_gain)
                 )
