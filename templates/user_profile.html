@@ -43,6 +43,34 @@
         {% endif %}
     </section>
 
+    <section id="strava-workouts" class="mt-5">
+        <h2 class="mb-3">Your Strava Workouts</h2>
+        {% if strava_connected %}
+            {% if strava_workouts %}
+                <div class="list-group">
+                {% for workout in strava_workouts %}
+                    <div class="list-group-item mb-3">
+                        <h3 class="mb-2">{{ workout.name }} on {{ workout.start_date.strftime('%B %d, %Y') }}</h3>
+                        <ul class="list-unstyled">
+                            <li>Type: {{ workout.type }}</li>
+                            <li>Distance: {{ "%.2f"|format(workout.distance / 1000) }} km</li>
+                            <li>Duration: {{ "%d:%02d:%02d"|format(workout.moving_time // 3600, (workout.moving_time % 3600) // 60, workout.moving_time % 60) }}</li>
+                            <li>Average Speed: {{ "%.2f"|format(workout.average_speed * 3.6) }} km/h</li>
+                            <li>Elevation Gain: {{ "%.2f"|format(workout.total_elevation_gain) }} m</li>
+                        </ul>
+                    </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <p class="alert alert-info">No Strava workouts imported yet.</p>
+            {% endif %}
+            <a href="{{ url_for('import_strava_workouts') }}" class="btn btn-success">Import Strava Workouts</a>
+        {% else %}
+            <p class="alert alert-info">Connect your Strava account to import workouts.</p>
+            <a href="{{ url_for('strava_auth') }}" class="btn btn-primary">Connect Strava</a>
+        {% endif %}
+    </section>
+
     <div class="mt-4">
         <a href="{{ url_for('add_workout') }}" class="btn btn-success">Add New Workout</a>
         <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>

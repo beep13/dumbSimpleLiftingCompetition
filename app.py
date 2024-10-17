@@ -7,6 +7,8 @@ from sqlalchemy import func
 import os
 from dotenv import load_dotenv
 import logging
+from stravalib.client import Client
+from stravalib.exc import AccessUnauthorized
 
 load_dotenv()
 
@@ -18,6 +20,10 @@ app = Flask(__name__)
 
 # Secret key configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+# Strava configuration
+app.config['STRAVA_CLIENT_ID'] = os.getenv('STRAVA_CLIENT_ID')
+app.config['STRAVA_CLIENT_SECRET'] = os.getenv('STRAVA_CLIENT_SECRET')
+app.config['STRAVA_REDIRECT_URI'] = os.getenv('STRAVA_REDIRECT_URI', 'http://localhost:5000/strava/callback')
 
 # Database configuration
 try:
@@ -88,6 +94,29 @@ class WorkoutExercise(db.Model):
     reps = db.Column(db.Integer, nullable=False)
 
     exercise = db.relationship('Exercise')
+
+class StravaAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    access_token = db.Column(db.String(255), nullable=False)
+    refresh_token = db.Column(db.String(255), nullable=False)
+    token_expiry = db.Column(db.DateTime, nullable=False)
+
+    user = db.relationship('User', backref=db.backref('strava_account', uselist=False))
+
+class StravaWorkout(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    strava_id = db.Column(db.String(255), unique=True, nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    type = db.Column(db.String(50), nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False)
+    distance = db.Column(db.Float, nullable=False)
+    moving_time = db.Column(db.Integer, nullable=False)
+    average_speed = db.Column(db.Float, nullable=False)
+    total_elevation_gain = db.Column(db.Float, nullable=False)
+
+    user = db.relationship('User', backref=db.backref('strava_workouts', lazy='dynamic'))
 
 @app.route('/')
 def index():
@@ -237,7 +266,10 @@ def user_profile():
         return redirect(url_for('index'))
     
     workouts = Workout.query.filter_by(user_id=user.id).order_by(Workout.date.desc()).all()
-    return render_template('user_profile.html', user=user, workouts=workouts)
+    strava_workouts = StravaWorkout.query.filter_by(user_id=user.id).order_by(StravaWorkout.start_date.desc()).all()
+    strava_connected = StravaAccount.query.filter_by(user_id=user.id).first() is not None
+    
+    return render_template('user_profile.html', user=user, workouts=workouts, strava_workouts=strava_workouts, strava_connected=strava_connected)
 
 @app.route('/edit_workout/<int:workout_id>', methods=['GET', 'POST'])
 def edit_workout(workout_id):
@@ -398,6 +430,95 @@ def utility_processor():
             return User.query.get(session['user_id'])
         return None
     return dict(get_current_user=get_current_user)
+
+@app.route('/strava/auth')
+def strava_auth():
+    if 'user_id' not in session:
+        flash('Please login to connect with Strava', 'warning')
+        return redirect(url_for('login'))
+    
+    client = Client()
+    authorize_url = client.authorization_url(
+        client_id=app.config['STRAVA_CLIENT_ID'],
+        redirect_uri=app.config['STRAVA_REDIRECT_URI'],
+        scope=['read_all', 'activity:read_all']
+    )
+    return redirect(authorize_url)
+
+@app.route('/strava/callback')
+def strava_callback():
+    if 'user_id' not in session:
+        flash('Please login to connect with Strava', 'warning')
+        return redirect(url_for('login'))
+    
+    code = request.args.get('code')
+    client = Client()
+    token_response = client.exchange_code_for_token(
+        client_id=app.config['STRAVA_CLIENT_ID'],
+        client_secret=app.config['STRAVA_CLIENT_SECRET'],
+        code=code
+    )
+    
+    access_token = token_response['access_token']
+    refresh_token = token_response['refresh_token']
+    expires_at = datetime.fromtimestamp(token_response['expires_at'])
+    
+    strava_account = StravaAccount.query.filter_by(user_id=session['user_id']).first()
+    if strava_account:
+        strava_account.access_token = access_token
+        strava_account.refresh_token = refresh_token
+        strava_account.token_expiry = expires_at
+    else:
+        strava_account = StravaAccount(
+            user_id=session['user_id'],
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expiry=expires_at
+        )
+        db.session.add(strava_account)
+    
+    db.session.commit()
+    flash('Successfully connected to Strava!', 'success')
+    return redirect(url_for('import_strava_workouts'))
+
+@app.route('/strava/import')
+def import_strava_workouts():
+    if 'user_id' not in session:
+        flash('Please login to import Strava workouts', 'warning')
+        return redirect(url_for('login'))
+    
+    strava_account = StravaAccount.query.filter_by(user_id=session['user_id']).first()
+    if not strava_account:
+        flash('Please connect your Strava account first', 'warning')
+        return redirect(url_for('strava_auth'))
+    
+    client = Client(access_token=strava_account.access_token)
+    
+    try:
+        activities = client.get_activities(after=datetime.utcnow() - timedelta(days=30))
+        for activity in activities:
+            existing_workout = StravaWorkout.query.filter_by(strava_id=str(activity.id)).first()
+            if not existing_workout:
+                new_workout = StravaWorkout(
+                    user_id=session['user_id'],
+                    strava_id=str(activity.id),
+                    name=activity.name,
+                    type=activity.type,
+                    start_date=activity.start_date,
+                    distance=float(activity.distance),
+                    moving_time=int(activity.moving_time.total_seconds()),
+                    average_speed=float(activity.average_speed),
+                    total_elevation_gain=float(activity.total_elevation_gain)
+                )
+                db.session.add(new_workout)
+        
+        db.session.commit()
+        flash('Successfully imported Strava workouts!', 'success')
+    except AccessUnauthorized:
+        flash('Strava access token expired. Please reconnect your account.', 'warning')
+        return redirect(url_for('strava_auth'))
+    
+    return redirect(url_for('user_profile'))
 
 with app.app_context():
     db.create_all()
