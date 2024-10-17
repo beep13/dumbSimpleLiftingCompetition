@@ -64,7 +64,7 @@ class Workout(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
-    sets = db.relationship('Set', backref='workout', lazy=True)
+    sets = db.relationship('Set', backref='workout', lazy=True, cascade='all, delete-orphan')
 
 class Set(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -280,21 +280,23 @@ def edit_workout(workout_id):
 @app.route('/delete_workout/<int:workout_id>', methods=['POST'])
 def delete_workout(workout_id):
     if 'user_id' not in session:
-        flash('Please login to delete workouts')
+        flash('Please login to delete a workout')
         return redirect(url_for('login'))
-    
+
     workout = Workout.query.get_or_404(workout_id)
+
     if workout.user_id != session['user_id']:
-        abort(403)
-    
+        flash('You do not have permission to delete this workout')
+        return redirect(url_for('user_profile'))
+
     try:
         db.session.delete(workout)
         db.session.commit()
         flash('Workout deleted successfully')
     except Exception as e:
         db.session.rollback()
-        flash(f'An error occurred: {str(e)}')
-    
+        flash(f'An error occurred while deleting the workout: {str(e)}')
+
     return redirect(url_for('user_profile'))
 
 def populate_exercises():

@@ -26,7 +26,7 @@
                     <h3 class="mb-2">Workout on {{ workout.date.strftime('%B %d, %Y') }}</h3>
                     <ul class="list-unstyled">
                     {% for set in workout.sets %}
-                        <li>{{ set.exercise.name }}: {{ set.weight }} kg x {{ set.reps }} reps</li>
+                        <li>{{ set.exercise.name }}: {{ set.weight }} lbs x {{ set.reps }} reps</li>
                     {% endfor %}
                     </ul>
                     <div class="mt-2">
