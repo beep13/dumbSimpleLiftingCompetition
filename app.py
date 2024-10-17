@@ -257,19 +257,16 @@ def leaderboard():
 @app.route('/user_profile')
 def user_profile():
     if 'user_id' not in session:
-        flash('Please login to view your profile', 'warning')
+        flash('Please log in to view your profile.', 'warning')
         return redirect(url_for('login'))
     
     user = User.query.get(session['user_id'])
-    if user is None:
-        flash('User not found', 'danger')
-        return redirect(url_for('index'))
-    
     workouts = Workout.query.filter_by(user_id=user.id).order_by(Workout.date.desc()).all()
     strava_workouts = StravaWorkout.query.filter_by(user_id=user.id).order_by(StravaWorkout.start_date.desc()).all()
     strava_connected = StravaAccount.query.filter_by(user_id=user.id).first() is not None
     
-    return render_template('user_profile.html', user=user, workouts=workouts, strava_workouts=strava_workouts, strava_connected=strava_connected)
+    return render_template('user_profile.html', user=user, workouts=workouts, 
+                           strava_workouts=strava_workouts, strava_connected=strava_connected)
 
 @app.route('/edit_workout/<int:workout_id>', methods=['GET', 'POST'])
 def edit_workout(workout_id):
@@ -518,6 +515,54 @@ def import_strava_workouts():
         flash('Strava access token expired. Please reconnect your account.', 'warning')
         return redirect(url_for('strava_auth'))
     
+    return redirect(url_for('user_profile'))
+
+@app.route('/strava/disconnect', methods=['POST'])
+def strava_disconnect():
+    if 'user_id' not in session:
+        flash('Please log in to disconnect your Strava account.', 'warning')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    
+    # Get Strava account
+    strava_account = StravaAccount.query.filter_by(user_id=user_id).first()
+    
+    if strava_account:
+        # Revoke Strava access token
+        client = Client()
+        try:
+            client.deauthorize(access_token=strava_account.access_token)
+        except Exception as e:
+            # Log the error, but continue with local cleanup
+            print(f"Error revoking Strava token: {str(e)}")
+        
+        # Remove Strava account from our database
+        db.session.delete(strava_account)
+    
+    # Remove all Strava workouts
+    StravaWorkout.query.filter_by(user_id=user_id).delete()
+    
+    db.session.commit()
+    
+    flash('Your Strava account has been disconnected and all imported workouts have been removed.', 'success')
+    return redirect(url_for('user_profile'))
+
+@app.route('/strava/remove_workout/<int:workout_id>', methods=['POST'])
+def remove_strava_workout(workout_id):
+    if 'user_id' not in session:
+        flash('Please log in to remove Strava workouts.', 'warning')
+        return redirect(url_for('login'))
+    
+    workout = StravaWorkout.query.get_or_404(workout_id)
+    if workout.user_id != session['user_id']:
+        flash('You do not have permission to remove this workout.', 'danger')
+        return redirect(url_for('user_profile'))
+    
+    db.session.delete(workout)
+    db.session.commit()
+    
+    flash('Strava workout has been removed.', 'success')
     return redirect(url_for('user_profile'))
 
 with app.app_context():
