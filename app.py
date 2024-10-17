@@ -167,13 +167,16 @@ def add_workout():
         workout = Workout(user_id=user.id, date=date)
         db.session.add(workout)
         
-        for i in range(1, int(request.form['set_count']) + 1):
+        exercise_count = int(request.form['exercise_count'])
+        for i in range(1, exercise_count + 1):
             exercise_id = request.form[f'exercise_{i}']
-            weight = float(request.form[f'weight_{i}'])
+            sets = int(request.form[f'sets_{i}'])
             reps = int(request.form[f'reps_{i}'])
+            weight = float(request.form[f'weight_{i}'])
             
-            set = Set(workout=workout, exercise_id=exercise_id, weight=weight, reps=reps)
-            db.session.add(set)
+            for _ in range(sets):
+                set = Set(workout=workout, exercise_id=exercise_id, weight=weight, reps=reps)
+                db.session.add(set)
         
         try:
             db.session.commit()
