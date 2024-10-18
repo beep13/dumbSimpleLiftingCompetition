@@ -29,6 +29,10 @@
         {% else %}
             <p class="alert alert-info">You haven't logged any workouts yet.</p>
         {% endif %}
+        <div class="mt-4">
+          <a href="{{ url_for('add_workout') }}" class="btn btn-success">Add New Workout</a>
+          <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+      </div>
     </section>
 
     {% if strava_workouts %}
@@ -69,10 +73,5 @@
             <a href="{{ url_for('strava_auth') }}" class="btn btn-primary">Connect Strava</a>
         {% endif %}
     </section>
-
-    <div class="mt-4">
-        <a href="{{ url_for('add_workout') }}" class="btn btn-success">Add New Workout</a>
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
-    </div>
 </div>
 {% endblock %}
