@@ -157,17 +157,8 @@ def register():
         hashed_password = generate_password_hash(password)
         new_user = User(username=username, password_hash=hashed_password)
         
-        # Set default profile picture
-        default_picture = 'placeholderAvatar.jpg'
-        new_user.profile_picture = default_picture
-        
         db.session.add(new_user)
         db.session.commit()
-        
-        # Copy the default picture to the user's profile picture
-        source = os.path.join(app.static_folder, 'profile_pictures', default_picture)
-        destination = os.path.join(app.config['UPLOAD_FOLDER'], default_picture)
-        copy2(source, destination)
         
         flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('login'))
