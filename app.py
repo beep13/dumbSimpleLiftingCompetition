@@ -9,6 +9,11 @@ from dotenv import load_dotenv
 import logging
 from stravalib.client import Client
 from stravalib.exc import AccessUnauthorized
+from werkzeug.utils import secure_filename
+from shutil import copy2
+import uuid
+from PIL import Image
+from io import BytesIO
 
 load_dotenv()
 
@@ -24,6 +29,8 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['STRAVA_CLIENT_ID'] = os.getenv('STRAVA_CLIENT_ID')
 app.config['STRAVA_CLIENT_SECRET'] = os.getenv('STRAVA_CLIENT_SECRET')
 app.config['STRAVA_REDIRECT_URI'] = os.getenv('STRAVA_REDIRECT_URI', 'http://localhost:5000/strava/callback')
+
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'profile_pictures')
 
 # Database configuration
 try:
@@ -48,12 +55,21 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+# local file storage
+try:
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
+except Exception as e:
+    logger.error(f"Error creating upload folder: {str(e)}")
+    raise
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255))
     workouts = db.relationship('Workout', backref='user', lazy=True)
     is_admin = db.Column(db.Boolean, default=False)
+    profile_picture = db.Column(db.String(255), nullable=False, default='placeholderAvatar.jpg')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -134,17 +150,26 @@ def register():
         username = request.form['username']
         password = request.form['password']
         
-        user = User.query.filter_by(username=username).first()
-        if user:
-            flash('Username already exists')
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists', 'danger')
             return redirect(url_for('register'))
         
-        new_user = User(username=username)
-        new_user.set_password(password)
+        hashed_password = generate_password_hash(password)
+        new_user = User(username=username, password_hash=hashed_password)
+        
+        # Set default profile picture
+        default_picture = 'placeholderAvatar.jpg'
+        new_user.profile_picture = default_picture
+        
         db.session.add(new_user)
         db.session.commit()
         
-        flash('Registration successful')
+        # Copy the default picture to the user's profile picture
+        source = os.path.join(app.static_folder, 'profile_pictures', default_picture)
+        destination = os.path.join(app.config['UPLOAD_FOLDER'], default_picture)
+        copy2(source, destination)
+        
+        flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('login'))
     
     return render_template('register.html')
@@ -265,8 +290,11 @@ def user_profile():
     strava_workouts = StravaWorkout.query.filter_by(user_id=user.id).order_by(StravaWorkout.start_date.desc()).all()
     strava_connected = StravaAccount.query.filter_by(user_id=user.id).first() is not None
     
+    profile_picture_url = url_for('static', filename=f'profile_pictures/{user.profile_picture}') if user.profile_picture else None
+    
     return render_template('user_profile.html', user=user, workouts=workouts, 
-                           strava_workouts=strava_workouts, strava_connected=strava_connected)
+                           strava_workouts=strava_workouts, strava_connected=strava_connected,
+                           profile_picture_url=profile_picture_url)
 
 @app.route('/edit_workout/<int:workout_id>', methods=['GET', 'POST'])
 def edit_workout(workout_id):
@@ -563,6 +591,84 @@ def remove_strava_workout(workout_id):
     db.session.commit()
     
     flash('Strava workout has been removed.', 'success')
+    return redirect(url_for('user_profile'))
+
+def resize_and_crop(image, size):
+    """Resize and crop an image to fit the specified size."""
+    # If the image is larger than the specified size, resize it
+    if image.size[0] > size[0] or image.size[1] > size[1]:
+        image.thumbnail((size[0], size[1]), Image.LANCZOS)
+    
+    # Check which dimension is larger
+    if image.size[0] > image.size[1]:
+        # Width is larger. Calculate the trimming amount
+        left = (image.size[0] - size[0]) / 2
+        top = 0
+        right = (image.size[0] + size[0]) / 2
+        bottom = size[1]
+    else:
+        # Height is larger. Calculate the trimming amount
+        left = 0
+        top = (image.size[1] - size[1]) / 2
+        right = size[0]
+        bottom = (image.size[1] + size[1]) / 2
+    
+    # Crop and return the image
+    return image.crop((left, top, right, bottom))
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/upload_profile_picture', methods=['POST'])
+def upload_profile_picture():
+    if 'profile-picture' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['profile-picture']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        # Update user's profile picture in database
+        user = User.query.get(session['user_id'])
+        user.profile_picture = filename
+        db.session.commit()
+        flash('Your profile picture has been updated successfully!', 'success')
+        return jsonify({'success': 'Profile picture updated successfully'}), 200
+    else:
+        return jsonify({'error': 'Invalid file type'}), 400
+
+@app.route('/delete_profile_picture', methods=['POST'])
+def delete_profile_picture():
+    if 'user_id' not in session:
+        flash('Please log in to manage your profile picture', 'warning')
+        return redirect(url_for('login'))
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('user_profile'))
+    
+    if user.profile_picture != 'placeholderAvatar.jpg':
+        # Delete the current profile picture file
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], user.profile_picture)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        # Reset the user's profile picture to the default
+        user.profile_picture = 'placeholderAvatar.jpg'
+        db.session.commit()
+        
+        flash('Profile picture has been reset to default', 'success')
+    else:
+        flash('You are already using the default profile picture', 'info')
+    
     return redirect(url_for('user_profile'))
 
 with app.app_context():

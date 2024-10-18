@@ -57,3 +57,35 @@ input, select, textarea {
     border-radius: 0;
 }
 
+.rounded-bottom-right {
+    border-bottom-right-radius: 0.25rem !important;
+}
+
+.profile-picture-container {
+    position: relative;
+    display: inline-block;
+}
+
+.profile-picture {
+    border-radius: 0.25rem;
+}
+
+.upload-picture-btn,
+.delete-picture-btn {
+    position: absolute;
+    bottom: 0;
+    padding: 0.25rem 0.5rem;
+    line-height: 1;
+    font-size: 0.875rem;
+    border-radius: 0;
+}
+
+.upload-picture-btn {
+    left: 0;
+    border-top-right-radius: 0.25rem;
+}
+
+.delete-picture-btn {
+    right: 0;
+    border-top-left-radius: 0.25rem;
+}

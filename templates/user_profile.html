@@ -5,6 +5,23 @@
 {% block content %}
 <div class="container mt-4">
     <h1 class="mb-4">Welcome, {{ user.username }}!</h1>
+
+    <section id="profile-picture" class="mb-4">
+        <div class="profile-picture-container">
+            <img src="{{ url_for('static', filename='profile_pictures/' + user.profile_picture) }}" alt="Profile Picture" width="200" height="200" class="profile-picture">
+            <button id="upload-button" class="btn btn-primary btn-sm upload-picture-btn" title="Upload new picture">
+                <i class="fas fa-upload"></i>
+            </button>
+            {% if user.profile_picture != 'placeholderAvatar.jpg' %}
+                <form action="{{ url_for('delete_profile_picture') }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger btn-sm delete-picture-btn" title="Delete Picture">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </section>
+
     <section id="workouts">
         <h2 class="mb-3">Your Workouts</h2>
         {% if workouts %}
@@ -74,4 +91,52 @@
         {% endif %}
     </section>
 </div>
+
+<form id="upload-form" action="{{ url_for('upload_profile_picture') }}" method="POST" enctype="multipart/form-data" style="display: none;">
+    <input type="file" id="profile-picture" name="profile-picture" accept="image/*">
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var uploadButton = document.getElementById('upload-button');
+    var fileInput = document.getElementById('profile-picture');
+    var uploadForm = document.getElementById('upload-form');
+
+    uploadButton.addEventListener('click', function() {
+        var tempInput = document.createElement('input');
+        tempInput.type = 'file';
+        tempInput.accept = 'image/*';
+        
+        tempInput.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                console.log('File selected:', this.files[0].name);
+                
+                var formData = new FormData();
+                formData.append('profile-picture', this.files[0]);
+                
+                fetch(uploadForm.action, {
+                    method: 'POST',
+                    body: formData
+                }).then(response => {
+                    console.log('Response status:', response.status);
+                    return response.json();
+                }).then(data => {
+                    console.log('Response data:', data);
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        console.error('Upload failed:', data.error);
+                        alert('Upload failed: ' + data.error);
+                    }
+                }).catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            }
+        });
+
+        tempInput.click();
+    });
+});
+</script>
 {% endblock %}
