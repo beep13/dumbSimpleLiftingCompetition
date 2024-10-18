@@ -671,6 +671,11 @@ def delete_profile_picture():
     
     return redirect(url_for('user_profile'))
 
+@app.route('/roster', methods=['GET'])
+def roster():
+    users = User.query.all()
+    return render_template('roster.html', users=users)
+
 with app.app_context():
     db.create_all()
     populate_exercises()
