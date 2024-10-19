@@ -14,6 +14,9 @@ from shutil import copy2
 import uuid
 from PIL import Image
 from io import BytesIO
+from s3_utils import upload_file_to_s3, delete_file_from_s3
+from flask import current_app
+from config import DevelopmentConfig, ProductionConfig, TestingConfig
 
 load_dotenv()
 
@@ -22,6 +25,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Set the environment based on the FLASK_ENV environment variable
+app.env = os.environ.get('FLASK_ENV', 'development')
+
+# Load the appropriate configuration
+if app.env == 'production':
+    app.config.from_object(ProductionConfig)
+elif app.env == 'testing':
+    app.config.from_object(TestingConfig)
+else:
+    app.config.from_object(DevelopmentConfig)
 
 # Secret key configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
@@ -616,52 +630,74 @@ def allowed_file(filename):
 
 @app.route('/upload_profile_picture', methods=['POST'])
 def upload_profile_picture():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Please log in to update your profile picture'})
+
     if 'profile-picture' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
+        return jsonify({'success': False, 'error': 'No file part'})
     
     file = request.files['profile-picture']
     
     if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+        return jsonify({'success': False, 'error': 'No selected file'})
     
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        # Update user's profile picture in database
-        user = User.query.get(session['user_id'])
-        user.profile_picture = filename
-        db.session.commit()
-        flash('Your profile picture has been updated successfully!', 'success')
-        return jsonify({'success': 'Profile picture updated successfully'}), 200
+        
+        # Check file size (e.g., 5MB limit)
+        if len(file.read()) > 5 * 1024 * 1024:
+            return jsonify({'success': False, 'error': 'File size exceeds 5MB limit'})
+        file.seek(0)  # Reset file pointer after reading
+        
+        try:
+            if current_app.env == 'production':
+                output = upload_file_to_s3(file, session['user_id'])
+                if output is None:
+                    raise Exception('Error uploading to S3')
+            else:
+                file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
+                output = url_for('static', filename=f'profile_pictures/{filename}')
+            
+            user = User.query.get(session['user_id'])
+            if user.profile_picture != 'default.jpg':
+                if current_app.env == 'production':
+                    delete_file_from_s3(user.profile_picture)
+                else:
+                    os.remove(os.path.join(current_app.config['UPLOAD_FOLDER'], user.profile_picture))
+            
+            user.profile_picture = output
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Profile picture updated successfully', 'url': output})
+        except Exception as e:
+            logger.error(f"Error uploading profile picture: {str(e)}")
+            return jsonify({'success': False, 'error': f'Error uploading profile picture: {str(e)}'})
     else:
-        return jsonify({'error': 'Invalid file type'}), 400
+        return jsonify({'success': False, 'error': 'Invalid file type'})
 
 @app.route('/delete_profile_picture', methods=['POST'])
 def delete_profile_picture():
     if 'user_id' not in session:
-        flash('Please log in to manage your profile picture', 'warning')
-        return redirect(url_for('login'))
+        return jsonify({'success': False, 'error': 'Please log in to manage your profile picture'})
     
     user = User.query.get(session['user_id'])
     if not user:
-        flash('User not found', 'danger')
-        return redirect(url_for('user_profile'))
+        return jsonify({'success': False, 'error': 'User not found'})
     
-    if user.profile_picture != 'placeholderAvatar.jpg':
-        # Delete the current profile picture file
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], user.profile_picture)
-        if os.path.exists(file_path):
-            os.remove(file_path)
+    if user.profile_picture != 'default.jpg':
+        if current_app.env == 'production':
+            delete_file_from_s3(user.profile_picture)
+        else:
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], user.profile_picture)
+            if os.path.exists(file_path):
+                os.remove(file_path)
         
-        # Reset the user's profile picture to the default
-        user.profile_picture = 'placeholderAvatar.jpg'
+        user.profile_picture = 'default.jpg'
         db.session.commit()
         
-        flash('Profile picture has been reset to default', 'success')
+        return jsonify({'success': True, 'message': 'Profile picture has been reset to default'})
     else:
-        flash('You are already using the default profile picture', 'info')
-    
-    return redirect(url_for('user_profile'))
+        return jsonify({'success': False, 'error': 'You are already using the default profile picture'})
 
 @app.route('/roster', methods=['GET'])
 def roster():

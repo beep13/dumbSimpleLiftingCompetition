@@ -67,7 +67,9 @@ input, select, textarea {
 }
 
 .profile-picture {
-    border-radius: 0.25rem;
+    width: 300px;
+    height: 300px;
+    object-fit: cover;
 }
 
 .upload-picture-btn,
@@ -88,4 +90,10 @@ input, select, textarea {
 .delete-picture-btn {
     right: 0;
     border-top-left-radius: 0.25rem;
+}
+
+.roster-picture {
+    width: 300px;
+    height: 300px;
+    object-fit: cover;
 }
