@@ -668,6 +668,52 @@ def roster():
     users = User.query.all()
     return render_template('roster.html', users=users)
 
+@app.route('/update_profile', methods=['POST'])
+def update_profile():
+    if 'user_id' not in session:
+        flash('Please log in to update your profile', 'warning')
+        return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('index'))
+
+    # Update username
+    new_username = request.form.get('new_username')
+    if new_username and new_username != user.username:
+        if User.query.filter_by(username=new_username).first():
+            flash('Username already exists', 'danger')
+        else:
+            user.username = new_username
+            flash('Username updated successfully', 'success')
+
+    # Update email
+    new_email = request.form.get('new_email')
+    if new_email and new_email != user.email:
+        if User.query.filter_by(email=new_email).first():
+            flash('Email already exists', 'danger')
+        else:
+            user.email = new_email
+            flash('Email updated successfully', 'success')
+
+    # Update password
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    if current_password and new_password and confirm_password:
+        if not user.check_password(current_password):
+            flash('Current password is incorrect', 'danger')
+        elif new_password != confirm_password:
+            flash('New passwords do not match', 'danger')
+        else:
+            user.set_password(new_password)
+            flash('Password updated successfully', 'success')
+
+    db.session.commit()
+    return redirect(url_for('user_profile'))
+
 with app.app_context():
     db.create_all()
     populate_exercises()
