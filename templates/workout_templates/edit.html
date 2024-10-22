@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %} - Edit Workout Template{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Edit Workout Template</h1>
+
+    <form method="POST" id="editTemplateForm">
+        <div class="mb-3">
+            <label for="name" class="form-label">Template Name</label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ template.name }}" required>
+        </div>
+
+        <div id="exercises">
+            {% for exercise in template.exercises %}
+            <div class="exercise-row mb-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <select class="form-select" name="exercise_{{ loop.index }}" required>
+                            {% for ex in exercises %}
+                            <option value="{{ ex.id }}" {% if ex.id == exercise.exercise_id %}selected{% endif %}>{{ ex.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" name="sets_{{ loop.index }}" value="{{ exercise.sets }}" placeholder="Sets" required>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" name="reps_{{ loop.index }}" value="{{ exercise.reps }}" placeholder="Reps" required>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-danger remove-exercise">Remove</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" id="addExercise" class="btn btn-secondary mb-3">Add Exercise</button>
+
+        <input type="hidden" id="exerciseCount" name="exercise_count" value="{{ template.exercises|length }}">
+
+        <div class="mb-3">
+            <button type="submit" class="btn btn-primary">Update Template</button>
+            <a href="{{ url_for('workout_templates.list_templates') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const exercisesDiv = document.getElementById('exercises');
+    const addExerciseBtn = document.getElementById('addExercise');
+    const exerciseCountInput = document.getElementById('exerciseCount');
+    let exerciseCount = {{ template.exercises|length }};
+
+    addExerciseBtn.addEventListener('click', function() {
+        exerciseCount++;
+        const newExercise = document.createElement('div');
+        newExercise.className = 'exercise-row mb-3';
+        newExercise.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <select class="form-select" name="exercise_${exerciseCount}" required>
+                        {% for ex in exercises %}
+                        <option value="{{ ex.id }}">{{ ex.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" class="form-control" name="sets_${exerciseCount}" placeholder="Sets" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" class="form-control" name="reps_${exerciseCount}" placeholder="Reps" required>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-danger remove-exercise">Remove</button>
+                </div>
+            </div>
+        `;
+        exercisesDiv.appendChild(newExercise);
+        exerciseCountInput.value = exerciseCount;
+    });
+
+    exercisesDiv.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-exercise')) {
+            e.target.closest('.exercise-row').remove();
+            exerciseCount--;
+            exerciseCountInput.value = exerciseCount;
+        }
+    });
+});
+</script>
+{% endblock %}
+

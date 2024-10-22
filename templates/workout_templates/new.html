@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %} - Create New Workout Template{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Create New Workout Template</h1>
+
+    <form method="POST" id="newTemplateForm">
+        <div class="mb-3">
+            <label for="name" class="form-label">Template Name</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+        </div>
+
+        <div id="exercises">
+            <div class="exercise-row mb-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <select class="form-select" name="exercise_1" required>
+                            <option value="" disabled selected>Select Exercise</option>
+                            {% for exercise in exercises %}
+                            <option value="{{ exercise.id }}">{{ exercise.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" name="sets_1" placeholder="Sets" required>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" name="reps_1" placeholder="Reps" required>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-danger remove-exercise">Remove</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" id="addExercise" class="btn btn-secondary mb-3">Add Exercise</button>
+
+        <input type="hidden" id="exerciseCount" name="exercise_count" value="1">
+
+        <div class="mb-3">
+            <button type="submit" class="btn btn-primary">Create Template</button>
+            <a href="{{ url_for('workout_templates.list_templates') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const exercisesDiv = document.getElementById('exercises');
+    const addExerciseBtn = document.getElementById('addExercise');
+    const exerciseCountInput = document.getElementById('exerciseCount');
+    let exerciseCount = 1;
+
+    addExerciseBtn.addEventListener('click', function() {
+        exerciseCount++;
+        const newExercise = document.createElement('div');
+        newExercise.className = 'exercise-row mb-3';
+        newExercise.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <select class="form-select" name="exercise_${exerciseCount}" required>
+                        <option value="" disabled selected>Select Exercise</option>
+                        {% for exercise in exercises %}
+                        <option value="{{ exercise.id }}">{{ exercise.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" class="form-control" name="sets_${exerciseCount}" placeholder="Sets" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" class="form-control" name="reps_${exerciseCount}" placeholder="Reps" required>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-danger remove-exercise">Remove</button>
+                </div>
+            </div>
+        `;
+        exercisesDiv.appendChild(newExercise);
+        exerciseCountInput.value = exerciseCount;
+    });
+
+    exercisesDiv.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-exercise')) {
+            if (exerciseCount > 1) {
+                e.target.closest('.exercise-row').remove();
+                exerciseCount--;
+                exerciseCountInput.value = exerciseCount;
+            } else {
+                alert('You must have at least one exercise in the template.');
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
+

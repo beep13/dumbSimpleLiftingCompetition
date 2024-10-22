@@ -1,7 +1,4 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from sqlalchemy import func
 import os
@@ -10,13 +7,14 @@ import logging
 from stravalib.client import Client
 from stravalib.exc import AccessUnauthorized
 from werkzeug.utils import secure_filename
-from shutil import copy2
-import uuid
 from PIL import Image
-from io import BytesIO
 from s3_utils import upload_file_to_s3, delete_file_from_s3
 from flask import current_app
 from config import DevelopmentConfig, ProductionConfig, TestingConfig
+from workout_templates import workout_templates
+from models import User, Workout, Set, Exercise, StravaWorkout, StravaAccount, WeeklyWorkout, WorkoutTemplate
+from extensions import db, init_db
+from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
 
@@ -46,108 +44,9 @@ app.config['STRAVA_REDIRECT_URI'] = os.getenv('STRAVA_REDIRECT_URI', 'http://loc
 
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'profile_pictures')
 
-# Database configuration
-try:
-    if os.getenv('FLASK_ENV') == 'production':
-        database_url = os.getenv('DATABASE_URL')
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    else:
-        app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DEVELOPMENT_DATABASE_URL')
+init_db(app)
 
-    if not app.config['SQLALCHEMY_DATABASE_URI']:
-        raise ValueError("Database URL is not set")
-
-    logger.info(f"Using database: {app.config['SQLALCHEMY_DATABASE_URI']}")
-except Exception as e:
-    logger.error(f"Error configuring database: {str(e)}")
-    raise
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
-# local file storage
-try:
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
-except Exception as e:
-    logger.error(f"Error creating upload folder: {str(e)}")
-    raise
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    password_hash = db.Column(db.String(255))
-    workouts = db.relationship('Workout', backref='user', lazy=True)
-    is_admin = db.Column(db.Boolean, default=False)
-    profile_picture = db.Column(db.String(255), nullable=False, default='placeholderAvatar.jpg')
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-class Exercise(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    muscle_group = db.Column(db.String(50), nullable=False)
-
-class Workout(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    sets = db.relationship('Set', backref='workout', lazy=True, cascade='all, delete-orphan')
-
-class Set(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    workout_id = db.Column(db.Integer, db.ForeignKey('workout.id'), nullable=False)
-    exercise_id = db.Column(db.Integer, db.ForeignKey('exercise.id'), nullable=False)
-    weight = db.Column(db.Float, nullable=False)
-    reps = db.Column(db.Integer, nullable=False)
-    exercise = db.relationship('Exercise')
-
-class WeeklyWorkout(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    day = db.Column(db.String(10), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    exercises = db.relationship('WorkoutExercise', backref='weekly_workout', lazy=True, cascade="all, delete-orphan")
-
-class WorkoutExercise(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    weekly_workout_id = db.Column(db.Integer, db.ForeignKey('weekly_workout.id'), nullable=False)
-    exercise_id = db.Column(db.Integer, db.ForeignKey('exercise.id'), nullable=False)
-    sets = db.Column(db.Integer, nullable=False)
-    reps = db.Column(db.Integer, nullable=False)
-
-    exercise = db.relationship('Exercise')
-
-class StravaAccount(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    access_token = db.Column(db.String(255), nullable=False)
-    refresh_token = db.Column(db.String(255), nullable=False)
-    token_expiry = db.Column(db.DateTime, nullable=False)
-
-    user = db.relationship('User', backref=db.backref('strava_account', uselist=False))
-
-class StravaWorkout(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    strava_id = db.Column(db.String(255), unique=True, nullable=False)
-    name = db.Column(db.String(255), nullable=False)
-    type = db.Column(db.String(50), nullable=False)
-    start_date = db.Column(db.DateTime, nullable=False)
-    distance = db.Column(db.Float, nullable=False)
-    moving_time = db.Column(db.Integer, nullable=False)
-    average_speed = db.Column(db.Float, nullable=False)
-    total_elevation_gain = db.Column(db.Float, nullable=False)
-
-    user = db.relationship('User', backref=db.backref('strava_workouts', lazy='dynamic'))
+app.register_blueprint(workout_templates, url_prefix='/workout_templates')
 
 @app.route('/')
 def index():
@@ -204,11 +103,14 @@ def logout():
 
 @app.route('/add_workout', methods=['GET', 'POST'])
 def add_workout():
+    if request.method == 'GET':
+        exercises = Exercise.query.all()
+        templates = WorkoutTemplate.query.all()
+        return render_template('add_workout.html', exercises=exercises, templates=templates)
+    
     if 'user_id' not in session:
         flash('Please login to add a workout')
         return redirect(url_for('login'))
-    
-    exercises = Exercise.query.all()
     
     if request.method == 'POST':
         date_str = request.form['date']
@@ -247,7 +149,7 @@ def add_workout():
             flash(f'An error occurred: {str(e)}')
             return redirect(url_for('add_workout'))
     
-    return render_template('add_workout.html', exercises=exercises)
+    return render_template('add_workout.html', exercises=exercises, templates=templates)
 
 @app.route('/leaderboard')
 def leaderboard():
@@ -436,7 +338,8 @@ def admin_weekly_workout():
             db.session.commit()
             flash('Weekly workout routine updated successfully', 'success')
         
-        return redirect(url_for('admin_weekly_workout'))
+        exercises = Exercise.query.order_by(Exercise.muscle_group, Exercise.name).all()
+        return redirect(url_for('admin_weekly_workout', exercises=exercises))
 
     # GET request handling
     weekly_workouts = WeeklyWorkout.query.all()

@@ -6,6 +6,15 @@
 <h1 class="mb-4">Log Your Workout</h1>
 <form method="POST" action="{{ url_for('add_workout') }}">
     <div class="mb-3">
+        <label for="template" class="form-label">Load Template:</label>
+        <select id="template" class="form-select">
+            <option value="">Select a template</option>
+            {% for template in templates %}
+                <option value="{{ template.id }}">{{ template.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
         <label for="date" class="form-label">Date:</label>
         <input type="date" id="date" name="date" class="form-control" required>
     </div>
@@ -71,5 +80,62 @@
         exercisesDiv.appendChild(newExercise);
         document.getElementById('exercise-count').value = exerciseCount;
     });
+
+    document.getElementById('template').addEventListener('change', function() {
+        const templateId = this.value;
+        if (templateId) {
+            fetch(`/workout_templates/load_template/${templateId}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Received template data:', data);
+                    const exercisesDiv = document.getElementById('exercises');
+                    exercisesDiv.innerHTML = ''; // Clear existing exercises
+                    data.exercises.forEach((exercise, index) => {
+                        addExerciseToForm(exercise, index + 1);
+                    });
+                    exerciseCount = data.exercises.length;
+                    document.getElementById('exercise-count').value = exerciseCount;
+                })
+                .catch(error => console.error('Error loading template:', error));
+        }
+    });
+
+    function addExerciseToForm(exercise, index) {
+        console.log('Adding exercise to form:', exercise, index);
+        const exercisesDiv = document.getElementById('exercises');
+        const newExercise = document.createElement('div');
+        newExercise.className = 'exercise-entry mb-3';
+        newExercise.innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <select name="exercise_${index}" class="form-select" required>
+                        <option value="">Select an exercise</option>
+                        {% for exercise in exercises %}
+                            <option value="{{ exercise.id }}">{{ exercise.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="sets_${index}" class="form-control" placeholder="Sets" required value="${exercise.sets}">
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="reps_${index}" class="form-control" placeholder="Reps" required value="${exercise.reps}">
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="weight_${index}" class="form-control" placeholder="Weight (lbs)" required>
+                </div>
+            </div>
+        `;
+        exercisesDiv.appendChild(newExercise);
+
+        // Set the exercise name
+        const selectElement = newExercise.querySelector(`select[name="exercise_${index}"]`);
+        for (let i = 0; i < selectElement.options.length; i++) {
+            if (selectElement.options[i].text === exercise.name) {
+                selectElement.selectedIndex = i;
+                break;
+            }
+        }
+    }
 </script>
 {% endblock %}
