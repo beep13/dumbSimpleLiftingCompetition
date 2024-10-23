@@ -97,3 +97,13 @@ input, select, textarea {
     height: 300px;
     object-fit: cover;
 }
+
+html, body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+}
+
+* {
+    max-width: 100%;
+}
