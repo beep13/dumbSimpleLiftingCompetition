@@ -6,19 +6,26 @@
 <div class="container mt-4">
     <h1 class="mb-4">Roster</h1>
     <div class="row">
-        {% for user in users %}
-            <div class="col-md-4 mb-3">
-                <div class="user-card">
-                    {% if user.profile_picture and user.profile_picture != 'placeholderAvatar.jpg' %}
-                        <img src="{{ user.profile_picture }}" alt="{{ user.username }}'s Profile Picture" class="roster-picture">
-                    {% else %}
-                        <img src="https://lift-ftb.s3.amazonaws.com/profile_pictures/placeholderAvatar.jpg" alt="Default Profile Picture" class="roster-picture">
-                    {% endif %}
-                    <h3>{{ user.username }}</h3>
-                    <!-- ... other user information ... -->
-                </div>
-            </div>
-        {% endfor %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Username</th>
+                        <th>Total Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="username-cell">{{ user.username }}</td>
+                        <td>{{ user.total_score }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
