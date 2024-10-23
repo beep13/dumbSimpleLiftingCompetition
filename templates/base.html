@@ -44,7 +44,8 @@
                                     Admin
                                 </a>
                                 <ul class="dropdown-menu" aria-labelledby="adminDropdown">
-                                    <li><a class="dropdown-item" href="{{ url_for('admin_weekly_workout') }}">Weekly Workout</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin.view_weekly_workouts') }}">View Weekly Workouts</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin.create_weekly_workout') }}">Create Weekly Workout</a></li>
                                 </ul>
                             </li>
                         {% endif %}

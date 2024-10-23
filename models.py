@@ -37,9 +37,22 @@ class Set(db.Model):
 
 class WeeklyWorkout(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    day = db.Column(db.String(10), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    exercises = db.relationship('WorkoutExercise', backref='weekly_workout', lazy=True, cascade="all, delete-orphan")
+    week_start_date = db.Column(db.Date, nullable=False)
+    monday_template_id = db.Column(db.Integer, db.ForeignKey('workout_template.id'))
+    tuesday_template_id = db.Column(db.Integer, db.ForeignKey('workout_template.id'))
+    wednesday_template_id = db.Column(db.Integer, db.ForeignKey('workout_template.id'))
+    thursday_template_id = db.Column(db.Integer, db.ForeignKey('workout_template.id'))
+    friday_template_id = db.Column(db.Integer, db.ForeignKey('workout_template.id'))
+    saturday_template_id = db.Column(db.Integer, db.ForeignKey('workout_template.id'))
+    sunday_template_id = db.Column(db.Integer, db.ForeignKey('workout_template.id'))
+
+    monday_template = db.relationship('WorkoutTemplate', foreign_keys=[monday_template_id])
+    tuesday_template = db.relationship('WorkoutTemplate', foreign_keys=[tuesday_template_id])
+    wednesday_template = db.relationship('WorkoutTemplate', foreign_keys=[wednesday_template_id])
+    thursday_template = db.relationship('WorkoutTemplate', foreign_keys=[thursday_template_id])
+    friday_template = db.relationship('WorkoutTemplate', foreign_keys=[friday_template_id])
+    saturday_template = db.relationship('WorkoutTemplate', foreign_keys=[saturday_template_id])
+    sunday_template = db.relationship('WorkoutTemplate', foreign_keys=[sunday_template_id])
 
 class WorkoutExercise(db.Model):
     id = db.Column(db.Integer, primary_key=True)

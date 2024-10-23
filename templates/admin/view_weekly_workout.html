@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %} - View Weekly Workout{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Weekly Workout: {{ workout.week_start_date.strftime('%Y-%m-%d') }}</h1>
+    {% for day in ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] %}
+    <div class="mb-4">
+        <h3>{{ day|capitalize }}</h3>
+        {% set template_id = workout[day + '_template_id'] %}
+        {% if template_id %}
+            {% set template = workout[day + '_template'] %}
+            <p>Workout: {{ template.name }}</p>
+            <a href="{{ url_for('admin.view_template', template_id=template_id, return_to='admin.view_weekly_workout', workout_id=workout.id) }}" class="btn btn-sm btn-info">View Workout Details</a>
+        {% elif template_id is none %}
+            <p>Rest Day</p>
+        {% else %}
+            <p>No workout assigned</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+    <div class="mt-4">
+        <a href="{{ url_for('admin.view_weekly_workouts') }}" class="btn btn-secondary">Back to Weekly Workouts</a>
+        <a href="{{ url_for('admin.edit_weekly_workout', workout_id=workout.id) }}" class="btn btn-primary">Edit This Weekly Workout</a>
+    </div>
+</div>
+{% endblock %}

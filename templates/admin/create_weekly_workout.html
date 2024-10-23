@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %} - Create Weekly Workout{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Create Weekly Workout</h1>
+    <form method="POST" id="weeklyWorkoutForm">
+        <div class="mb-3">
+            <label for="week_start_date" class="form-label">Week Start Date</label>
+            <input type="date" class="form-control" id="week_start_date" name="week_start_date" required>
+            <small class="form-text text-muted">The date will be automatically adjusted to the previous Sunday.</small>
+        </div>
+        {% for day in ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] %}
+        <div class="mb-3">
+            <label for="{{ day }}_template" class="form-label">{{ day|capitalize }}</label>
+            <select class="form-select" id="{{ day }}_template" name="{{ day }}_template">
+                <option value="">Select a template (or leave blank for no workout)</option>
+                <option value="rest">Rest Day</option>
+                {% for template in templates %}
+                <option value="{{ template.id }}">{{ template.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="btn btn-sm btn-info mt-2" onclick="viewTemplate('{{ day }}_template', 'admin.create_weekly_workout')">View Selected Template</button>
+        </div>
+        {% endfor %}
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary" onclick="clearSavedData()">Create Weekly Workout</button>
+            <button type="button" class="btn btn-secondary ms-2" onclick="clearForm()">Clear Form</button>
+        </div>
+    </form>
+</div>
+
+<script>
+function saveFormData() {
+    const form = document.getElementById('weeklyWorkoutForm');
+    const formData = new FormData(form);
+    const data = {};
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    localStorage.setItem('weeklyWorkoutFormData', JSON.stringify(data));
+}
+
+function loadFormData() {
+    const savedData = localStorage.getItem('weeklyWorkoutFormData');
+    if (savedData) {
+        const data = JSON.parse(savedData);
+        const form = document.getElementById('weeklyWorkoutForm');
+        for (let key in data) {
+            const input = form.elements[key];
+            if (input) {
+                input.value = data[key];
+            }
+        }
+    }
+}
+
+function viewTemplate(selectId, returnTo) {
+    var templateId = document.getElementById(selectId).value;
+    if (templateId && templateId !== 'rest' && templateId !== '') {
+        saveFormData();
+        window.location.href = "{{ url_for('admin.view_template', template_id=0, return_to='') }}".replace('0', templateId).replace('return_to=', 'return_to=' + returnTo);
+    } else {
+        alert('Please select a valid template to view.');
+    }
+}
+
+function clearSavedData() {
+    localStorage.removeItem('weeklyWorkoutFormData');
+}
+
+function clearForm() {
+    document.getElementById('weeklyWorkoutForm').reset();
+    clearSavedData();
+}
+
+// Load saved form data when the page loads
+document.addEventListener('DOMContentLoaded', loadFormData);
+</script>
+{% endblock %}

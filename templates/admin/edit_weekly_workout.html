@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %} - Edit Weekly Workout{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Edit Weekly Workout</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="week_start_date" class="form-label">Week Start Date</label>
+            <input type="date" class="form-control" id="week_start_date" name="week_start_date" value="{{ workout.week_start_date.strftime('%Y-%m-%d') }}" required>
+        </div>
+        {% for day in ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] %}
+        <div class="mb-3">
+            <label for="{{ day }}_template" class="form-label">{{ day|capitalize }}</label>
+            <select class="form-select" id="{{ day }}_template" name="{{ day }}_template">
+                <option value="">Select a template (or leave blank for no workout)</option>
+                <option value="rest" {% if workout[day + '_template_id'] is none %}selected{% endif %}>Rest Day</option>
+                {% for template in templates %}
+                <option value="{{ template.id }}" {% if workout[day + '_template_id'] == template.id %}selected{% endif %}>{{ template.name }}</option>
+                {% endfor %}
+            </select>
+            {% if workout[day + '_template_id'] %}
+                <a href="{{ url_for('admin.view_template', template_id=workout[day + '_template_id'], return_to='admin.edit_weekly_workout', workout_id=workout.id) }}" class="btn btn-sm btn-info mt-2">View Workout Details</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Update Weekly Workout</button>
+        <a href="{{ url_for('admin.view_weekly_workouts') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %} - View Weekly Workouts{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Weekly Workouts</h1>
+    <a href="{{ url_for('admin.create_weekly_workout') }}" class="btn btn-primary mb-3">Create New Weekly Workout</a>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Week Start Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for workout in weekly_workouts %}
+            <tr>
+                <td>{{ workout.week_start_date.strftime('%Y-%m-%d') }}</td>
+                <td>
+                    <a href="{{ url_for('admin.view_weekly_workout', workout_id=workout.id) }}" class="btn btn-sm btn-info">View</a>
+                    <a href="{{ url_for('admin.edit_weekly_workout', workout_id=workout.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

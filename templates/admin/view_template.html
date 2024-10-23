@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %} - View Template: {{ template.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ template.name }}</h1>
+    <ul class="list-group">
+        {% for exercise in template.exercises %}
+        <li class="list-group-item">
+            {{ exercise.exercise.name }}: {{ exercise.sets }} sets of {{ exercise.reps }} reps
+        </li>
+        {% endfor %}
+    </ul>
+    {% if return_to == 'admin.view_weekly_workout' and workout_id %}
+        <a href="{{ url_for(return_to, workout_id=workout_id) }}" class="btn btn-primary mt-3">Back</a>
+    {% elif return_to == 'admin.edit_weekly_workout' and workout_id %}
+        <a href="{{ url_for(return_to, workout_id=workout_id) }}" class="btn btn-primary mt-3">Back</a>
+    {% else %}
+        <a href="{{ url_for(return_to) }}" class="btn btn-primary mt-3">Back</a>
+    {% endif %}
+</div>
+{% endblock %}

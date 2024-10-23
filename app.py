@@ -15,6 +15,7 @@ from workout_templates import workout_templates
 from models import User, Workout, Set, Exercise, StravaWorkout, StravaAccount, WeeklyWorkout, WorkoutTemplate
 from extensions import db, init_db
 from werkzeug.security import generate_password_hash, check_password_hash
+from admin import admin as admin_blueprint
 
 load_dotenv()
 
@@ -47,6 +48,7 @@ app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__fil
 init_db(app)
 
 app.register_blueprint(workout_templates, url_prefix='/workout_templates')
+app.register_blueprint(admin_blueprint, url_prefix='/admin')
 
 @app.route('/')
 def index():
@@ -54,8 +56,18 @@ def index():
     suggested_workout = None
     if 'user_id' in session:
         user = User.query.get(session['user_id'])
-        today = datetime.now().strftime('%A')
-        suggested_workout = WeeklyWorkout.query.filter_by(day=today).first()
+        today = datetime.now()
+        day_of_week = today.strftime('%A').lower()  # e.g., 'monday', 'tuesday', etc.
+        
+        # Find the most recent weekly workout
+        latest_weekly_workout = WeeklyWorkout.query.order_by(WeeklyWorkout.week_start_date.desc()).first()
+        
+        if latest_weekly_workout:
+            # Get the template for today
+            template_id = getattr(latest_weekly_workout, f'{day_of_week}_template_id')
+            if template_id:
+                suggested_workout = WorkoutTemplate.query.get(template_id)
+    
     return render_template('index.html', user=user, suggested_workout=suggested_workout)
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -285,72 +297,6 @@ def populate_exercises():
             db.session.add(new_exercise)
     
     db.session.commit()
-
-@app.route('/admin/weekly_workout', methods=['GET', 'POST'])
-def admin_weekly_workout():
-    if 'user_id' not in session:
-        abort(403)  # Forbidden
-    
-    user = User.query.get(session['user_id'])
-    if not user or not user.is_admin:
-        abort(403)  # Forbidden
-    
-    if request.method == 'POST':
-        if 'new_exercise' in request.form:
-            name = request.form.get('exercise_name').strip()
-            muscle_group = request.form.get('muscle_group')
-            
-            if name and muscle_group:
-                existing_exercise = Exercise.query.filter(func.lower(Exercise.name) == name.lower()).first()
-                if existing_exercise:
-                    return jsonify({'status': 'error', 'message': f'Exercise "{name}" already exists!'}), 400
-                else:
-                    new_exercise = Exercise(name=name, muscle_group=muscle_group)
-                    db.session.add(new_exercise)
-                    db.session.commit()
-                    return jsonify({'status': 'success', 'message': f'New exercise "{name}" added successfully!'}), 200
-            else:
-                return jsonify({'status': 'error', 'message': 'Exercise name and muscle group are required!'}), 400
-        else:
-            # Handle weekly workout updates
-            WeeklyWorkout.query.delete()  # Clear existing workouts
-            
-            days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            for day in days:
-                workout_name = request.form.get(f'{day}_name')
-                if workout_name:
-                    workout = WeeklyWorkout(day=day, name=workout_name)
-                    db.session.add(workout)
-                    
-                    exercise_count = int(request.form.get(f'{day}_exercise_count', 0))
-                    for i in range(1, exercise_count + 1):
-                        exercise_id = request.form.get(f'{day}_exercise_{i}')
-                        sets = request.form.get(f'{day}_sets_{i}')
-                        reps = request.form.get(f'{day}_reps_{i}')
-                        if exercise_id and sets and reps:
-                            exercise = WorkoutExercise(
-                                exercise_id=exercise_id,
-                                sets=sets,
-                                reps=reps
-                            )
-                            workout.exercises.append(exercise)
-            
-            db.session.commit()
-            flash('Weekly workout routine updated successfully', 'success')
-        
-        exercises = Exercise.query.order_by(Exercise.muscle_group, Exercise.name).all()
-        return redirect(url_for('admin_weekly_workout', exercises=exercises))
-
-    # GET request handling
-    weekly_workouts = WeeklyWorkout.query.all()
-    exercises = Exercise.query.order_by(Exercise.muscle_group, Exercise.name).all()
-    muscle_groups = db.session.query(func.distinct(Exercise.muscle_group)).order_by(Exercise.muscle_group).all()
-    muscle_groups = [group[0] for group in muscle_groups]  # Flatten the result
-
-    return render_template('admin_weekly_workout.html', 
-                           weekly_workouts=weekly_workouts, 
-                           exercises=exercises, 
-                           muscle_groups=muscle_groups)
 
 @app.route('/exercises', methods=['GET'])
 def get_exercises():
@@ -652,6 +598,12 @@ def update_profile():
 
     db.session.commit()
     return redirect(url_for('user_profile'))
+
+@app.context_processor
+def inject_user():
+    if 'user_id' in session:
+        return {'user': db.session.get(User, session['user_id'])}
+    return {'user': None}
 
 with app.app_context():
     db.create_all()

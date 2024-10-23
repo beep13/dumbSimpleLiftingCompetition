@@ -17,6 +17,22 @@
 
 {% if session.get('user_id') %}
     <p class="lead">Hello, {{ user.username }}! Ready for your next workout?</p>
+    
+    {% if suggested_workout %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Today's Suggested Workout: {{ suggested_workout.name }}</h2>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for exercise in suggested_workout.exercises %}
+                    <li class="list-group-item">{{ exercise.exercise.name }}: {{ exercise.sets }} sets of {{ exercise.reps }} reps</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% else %}
+        <p class="mb-4">No specific workout suggested for today. Feel free to choose your own!</p>
+    {% endif %}
+    
     <a href="{{ url_for('add_workout') }}" class="btn btn-primary">Log a Workout</a>
 {% else %}
     <p class="lead">Do it ftb</p>
